@@ -1,2 +1,13 @@
-venv/
+# Python sistem dosyaları
 __pycache__/
+*.pyc
+
+# Sanal ortam
+venv/
+env/
+
+# Mac sistem dosyaları
+.DS_Store
+
+# Veri dosyaları (isteğe bağlı, sadece ham datayı tutmak istiyorsanız)
+data/*.txt
