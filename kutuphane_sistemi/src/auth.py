@@ -98,14 +98,27 @@ def kullanici_sil():
 
 def gui_login(kullanici_adi, sifre):
     """Arayüzden (UI) gelen verilerle arka plan doğrulamasını yapar."""
+    
+    # ==========================================
+    # 👑 YÖNETİCİ KADROSU (EKİP ARKADAŞLARIN)
+    # ==========================================
+    # Kendi grubunuzdaki isimleri buraya küçük harflerle ekle
+    yoneticiler = ["batuhan", "elif", "deniz", "damla"]
+    
+    # Kullanıcı yanlışlıkla büyük harf veya boşluk girerse diye temizliyoruz
+    girilen_ad = kullanici_adi.lower().strip()
+
     # YÖNETİCİ KONTROLÜ (TOUCH ID)
-    if kullanici_adi == "admin":
+    if girilen_ad in yoneticiler:
         if admin_touch_id_dogrula():
-            return True, "yonetici", "Parmak izi onaylandı!"
+            # İsimle karşılama mesajı eklendi
+            return True, "yonetici", f"Hoş geldin {kullanici_adi.capitalize()}!"
         else:
             return False, None, "Touch ID reddedildi veya iptal edildi!"
 
-    # DİĞER KULLANICILAR İÇİN ŞİFRE KONTROLÜ
+    # ==========================================
+    # 👥 DİĞER KULLANICILAR İÇİN ŞİFRE KONTROLÜ
+    # ==========================================
     hashed_sifre = hash_password(sifre)
     
     if not os.path.exists(DOSYA_YOLU):

@@ -9,7 +9,7 @@ import threading
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 from src.auth import gui_login
-from src.assistant import flamingo_konus
+
 
 FLAMINGO_PATH = os.path.join(BASE_DIR, "assets", "flamingo.png")
 
@@ -66,7 +66,65 @@ def ana_menu_ac(kullanici_adi, rol):
         bilgi_karti(kart_frame, "👥 Toplam Üye", "412", "#4338CA")
 
         ctk.CTkLabel(icerik_alani, text=f"Hoş geldin {kullanici_adi}. Keyifli çalışmalar!", font=("Helvetica", 16), text_color="gray").pack(pady=40)
+    # --- POP-UP: YENİ KİTAP EKLEME FORMU ---
+    def kitap_ekle_popup():
+        # Yeni bir üst pencere oluştur
+        popup = ctk.CTkToplevel(dashboard)
+        popup.title("Yeni Kitap Ekle")
+        popup.geometry("450x550")
+        popup.configure(fg_color="#1E1E1E")
+        popup.attributes("-topmost", True) # Her zaman en üstte kalsın
+        popup.resizable(False, False)
 
+        # Pencereyi ekranın tam ortasına hizalama matematiği
+        popup.update_idletasks()
+        x = (popup.winfo_screenwidth() // 2) - (450 // 2)
+        y = (popup.winfo_screenheight() // 2) - (550 // 2)
+        popup.geometry(f"+{x}+{y}")
+
+        # Başlık
+        ctk.CTkLabel(popup, text="📖 Yeni Kitap Kaydı", font=("Helvetica", 24, "bold"), text_color="white").pack(pady=(30, 20))
+
+        # Girdi Alanları (Şekilli ve Ortak Stil)
+        entry_stil = {
+            "width": 350, "height": 45, "font": ("Helvetica", 14), 
+            "corner_radius": 10, "fg_color": "#2A2A2A", "border_color": "#007A87"
+        }
+        
+        ad_entry = ctk.CTkEntry(popup, placeholder_text="Kitap Adı", **entry_stil)
+        ad_entry.pack(pady=10)
+
+        yazar_entry = ctk.CTkEntry(popup, placeholder_text="Yazar", **entry_stil)
+        yazar_entry.pack(pady=10)
+
+        isbn_entry = ctk.CTkEntry(popup, placeholder_text="ISBN Numarası", **entry_stil)
+        isbn_entry.pack(pady=10)
+        
+        # Kategori için Şekilli Açılır Liste (OptionMenu)
+        kategori_var = ctk.StringVar(value="Kategori Seçin")
+        kategori_menu = ctk.CTkOptionMenu(
+            popup, variable=kategori_var, 
+            values=["Roman", "Bilim Kurgu", "Tarih", "Yazılım", "Mühendislik"], 
+            width=350, height=45, fg_color="#2A2A2A", button_color="#007A87", button_hover_color="#0097A7"
+        )
+        kategori_menu.pack(pady=10)
+
+        # Butonları yan yana koymak için bir çerçeve
+        buton_frame = ctk.CTkFrame(popup, fg_color="transparent")
+        buton_frame.pack(pady=(30, 10))
+
+        # Kaydetme işlemi (Şimdilik sadece terminale yazar ve pencereyi kapatır)
+        def kaydet():
+            print(f"Sisteme Eklenecek: {ad_entry.get()} - {kategori_var.get()}")
+            # İleride buraya grup arkadaşının inventory.py kodunu bağlayacağız
+            popup.destroy()
+
+        # İptal ve Kaydet Butonları
+        ctk.CTkButton(buton_frame, text="İptal", command=popup.destroy, width=140, height=45, 
+                      fg_color="transparent", border_width=2, border_color="#7F1D1D", text_color="white", hover_color="#7F1D1D").pack(side="left", padx=15)
+        
+        ctk.CTkButton(buton_frame, text="Kaydet", command=kaydet, width=140, height=45, 
+                      fg_color="#007A87", hover_color="#0097A7").pack(side="right", padx=15)
     def sayfa_kitap_islemleri():
         sayfayi_temizle()
         ctk.CTkLabel(icerik_alani, text="📚 Kitap Envanteri", font=("Helvetica", 32, "bold"), text_color="white").pack(pady=(40, 20), padx=40, anchor="w")
@@ -163,7 +221,6 @@ def giris_butonuna_tiklandi():
     basarili_mi, rol, mesaj = gui_login(kullanici, sifre)
     
     if basarili_mi:
-        threading.Thread(target=flamingo_konus, args=(kullanici, rol)).start()
         app.destroy()
         ana_menu_ac(kullanici, rol)
     else:
