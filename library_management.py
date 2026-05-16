@@ -49,12 +49,8 @@ def odunc_ver(kitap_id, kac_gun_once):
     print(f"[HATA] ID:{kitap_id} bulunamadı.")
 
 def analiz_raporu():
-    """Tüm işlemleri kontrol eder, gecikmeleri ve cezaları hesaplar."""
-    print("\n" + "="*60)
-    print(f"{'KÜTÜPHANE YÖNETİM VE ANALİZ RAPORU':^60}")
-    print("="*60)
-    print(f"{'Kitap Adı':<30} | {'Durum':<12} | {'Ceza':<10}")
-    print("-" * 60)
+    """Tüm işlemleri kontrol edip, gecikmeleri ve cezaları satır satır yazdırır."""
+    print("\n---KÜTÜPHANE YÖNETİM VE ANALİZ RAPORU---\n")
     
     toplam_ceza = 0
     simdi = datetime.datetime.now()
@@ -68,15 +64,18 @@ def analiz_raporu():
             ceza = gecikme_gun * GUNLUK_CEZA
             toplam_ceza += ceza
             durum = f"{gecikme_gun} Gün Gecikti"
-            print(f"{kitap_adi[:30]:<30} | {durum:<12} | {ceza:>6.2f} TL")
         else:
             kalan_gun = (iade_vakti - simdi).days
             durum = f"{kalan_gun} Gün Kaldı"
-            print(f"{kitap_adi[:30]:<30} | {durum:<12} | {'0.00':>6} TL")
+            ceza = 0.0
+
+        # Satır satır yazdırma bölümü
+        print(f"Kitap Adı : {kitap_adi}")
+        print(f"Durum     : {durum}")
+        print(f"Ceza      : {ceza:.2f} TL")
+        print("-" * 40)
             
-    print("-" * 60)
-    print(f"{'TOPLAM CEZA:':<45} {toplam_ceza:>8.2f} TL")
-    print("="*60)
+    print(f"TOPLAM CEZA: {toplam_ceza:.2f} TL\n")
 
 # --- 3. ANA DÖNGÜ ---
 
