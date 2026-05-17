@@ -103,7 +103,7 @@ def gui_login(kullanici_adi, sifre):
     # 👑 YÖNETİCİ KADROSU (EKİP ARKADAŞLARIN)
     # ==========================================
     # Kendi grubunuzdaki isimleri buraya küçük harflerle ekle
-    yoneticiler = ["batuhan", "elif", "deniz", "damla"]
+    yoneticiler = ["admin", "elif", "deniz", "damla"]
     
     # Kullanıcı yanlışlıkla büyük harf veya boşluk girerse diye temizliyoruz
     girilen_ad = kullanici_adi.lower().strip()

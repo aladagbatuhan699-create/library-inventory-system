@@ -22,13 +22,7 @@ kutuphane_db = EnvanterYonetimi()
 islem_db = IslemYonetimi(kutuphane_db)
 
 
-if kutuphane_db.envanter:
-    # Listendeki kitapların gerçek ISBN numaralarına göre simüle ediyoruz:
-    islem_db.odunc_ver("1927", 20)   # Nutuk'u 20 gün önce ver (5 gün gecikti)
-    islem_db.odunc_ver("12345", 5)   # Sefiller'ı 5 gün önce ver (Süresi var)
-    
-    # Konsola o efsane rapor şovunu bassın:
-    islem_db.analiz_raporu()
+
 # ==========================================
 # 2. AŞAMA: ANA YÖNETİM PANELİ (DASHBOARD)
 # ==========================================
@@ -197,11 +191,42 @@ def ana_menu_ac(kullanici_adi, rol):
                 ctk.CTkLabel(satir, text=f"Adet: {kitap.stok}", fg_color=stok_renk, corner_radius=10, width=60, height=28, text_color="white", font=("Helvetica", 12, "bold")).pack(side="right", padx=20)
 
         # Sayfa ilk açıldığında tüm kitapları göster (Boş arama)
-        tabloyu_doldur(kutuphane_db.envanter)    
+        tabloyu_doldur(kutuphane_db.envanter)
     # --- SAYFA 3: ÖDÜNÇ VE CEZA TAKİBİ ---
     def sayfa_odunc_takibi():
         sayfayi_temizle()
         ctk.CTkLabel(icerik_alani, text="💸 Ödünç ve Ceza Takibi", font=("Helvetica", 32, "bold"), text_color="white").pack(pady=(40, 10), padx=40, anchor="w")
+
+        # --- ÜST BUTON BARI ---
+        islem_bar = ctk.CTkFrame(icerik_alani, fg_color="transparent")
+        islem_bar.pack(fill="x", padx=40, pady=10)
+
+        if rol == "yonetici":
+            def hizli_odunc_ver():
+                dialog = ctk.CTkInputDialog(text="Ödünç verilecek kitabın ISBN numarası:", title="Ödünç Ver")
+                isbn = dialog.get_input()
+                if isbn:
+                    basari, mesaj = islem_db.odunc_ver(isbn)
+                    print(f"[SİSTEM] {mesaj}") 
+                    sayfa_odunc_takibi() 
+
+            def hizli_iade_al():
+                dialog = ctk.CTkInputDialog(text="İade edilecek kitabın ISBN numarası:", title="İade Al")
+                isbn = dialog.get_input()
+                if isbn:
+                    basari, mesaj = islem_db.iade_al(isbn)
+                    print(f"[SİSTEM] {mesaj}")
+                    sayfa_odunc_takibi() 
+
+            def gecikenler_raporu_al():
+                from src.reports import RaporMotoru
+                raporlayici = RaporMotoru(islem_db)
+                olusan_dosya = raporlayici.gecikenler_raporu_olustur()
+                print(f"[SİSTEM RAPORU] Rapor alındı:\n📁 {olusan_dosya}")
+
+            ctk.CTkButton(islem_bar, text="📤 Ödünç Ver", command=hizli_odunc_ver, fg_color="#D97706", hover_color="#B45309", height=40).pack(side="left", padx=10)
+            ctk.CTkButton(islem_bar, text="📥 İade Al", command=hizli_iade_al, fg_color="#059669", hover_color="#047857", height=40).pack(side="left")
+            ctk.CTkButton(islem_bar, text="📊 Gecikenleri Raporla", command=gecikenler_raporu_al, fg_color="#4F46E5", hover_color="#3730A3", height=40).pack(side="left", padx=10)
 
         # Tablo Başlıkları
         tablo_baslik = ctk.CTkFrame(icerik_alani, fg_color="#2A2A2A", height=40)
@@ -215,29 +240,12 @@ def ana_menu_ac(kullanici_adi, rol):
         liste_alani.pack(fill="both", expand=True, padx=40, pady=5)
 
         islemler = islem_db.yapilan_islemler
-        simdi = islem_db.kutuphane_db.__import__('datetime').datetime.now() if not hasattr(islem_db, 'datetime') else islem_db.datetime.now()
-        # Not: Yukarıdaki satır yerine dosyanın en üstüne 'import datetime' eklemen daha temiz olur.
-        # --- ÖDÜNÇ/İADE KONTROL BARI ---
-        islem_bar = ctk.CTkFrame(icerik_alani, fg_color="transparent")
-        islem_bar.pack(fill="x", padx=40, pady=10)
 
-        # Sadece Adminler işlem yapabilsin
-        if rol == "yonetici":
-            def hizli_odunc_ver():
-                # Şimdilik basitçe konsoldan ISBN alsın (Geliştirilebilir pop-up yapacağız)
-                dialog = ctk.CTkInputDialog(text="Ödünç verilecek kitabın ISBN numarası:", title="Ödünç Ver")
-                isbn = dialog.get_input()
-                if isbn:
-                    islem_db.odunc_ver(isbn, 0) # 0 gün önce (Yani ŞU AN) verildi
-                    sayfa_odunc_takibi() # Sayfayı yenile
-
-            ctk.CTkButton(islem_bar, text="📤 Ödünç Ver", command=hizli_odunc_ver, fg_color="#D97706", hover_color="#B45309", height=40).pack(side="left", padx=10)
-            ctk.CTkButton(islem_bar, text="📥 İade Al", fg_color="#059669", hover_color="#047857", height=40).pack(side="left") # İade fonksiyonunu sonra bağlarız
         if not islemler:
             ctk.CTkLabel(liste_alani, text="📭 Şu an aktif ödünç işlemi bulunmuyor.", font=("Helvetica", 16), text_color="gray").pack(pady=40)
             return
 
-        import datetime # Tarih hesaplamaları için
+        import datetime 
         simdi = datetime.datetime.now()
 
         for islem in islemler:
@@ -246,26 +254,24 @@ def ana_menu_ac(kullanici_adi, rol):
 
             ctk.CTkLabel(satir, text=islem["kitap_ad"], width=250, anchor="w", font=("Helvetica", 14)).pack(side="left", padx=10)
 
-            # Tarihleri "Gün/Ay/Yıl" formatına çeviriyoruz
             verilis_str = islem["verilis_tarihi"].strftime("%d/%m/%Y")
             iade_str = islem["iade_tarihi"].strftime("%d/%m/%Y")
 
             ctk.CTkLabel(satir, text=verilis_str, width=100, anchor="w", text_color="gray").pack(side="left", padx=10)
             ctk.CTkLabel(satir, text=iade_str, width=100, anchor="w", text_color="gray").pack(side="left", padx=10)
 
-            # --- CEZA HESAPLAMA MOTORU ---
             iade_vakti = islem["iade_tarihi"]
             if simdi > iade_vakti:
                 gecikme = (simdi - iade_vakti).days
                 ceza = gecikme * islem_db.GUNLUK_CEZA
                 durum_metni = f"{gecikme} Gün Gecikti | {ceza} TL"
-                renk = "#7F1D1D" # Gecikmişse Kırmızı yansın!
+                renk = "#7F1D1D" 
             else:
                 kalan = (iade_vakti - simdi).days
                 durum_metni = f"{kalan} Gün Kaldı"
-                renk = "green" # Süresi varsa Yeşil yansın!
+                renk = "green" 
 
-            ctk.CTkLabel(satir, text=durum_metni, fg_color=renk, corner_radius=10, width=150, height=28, text_color="white", font=("Helvetica", 12, "bold")).pack(side="right", padx=20)   
+            ctk.CTkLabel(satir, text=durum_metni, fg_color=renk, corner_radius=10, width=150, height=28, text_color="white", font=("Helvetica", 12, "bold")).pack(side="right", padx=20)        
     # --- 4. SIDEBAR BUTONLARI (TEMİZ VE TEKİL) ---
     btn_font = ("Helvetica", 16, "bold")
     

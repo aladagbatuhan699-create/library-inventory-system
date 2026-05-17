@@ -1,23 +1,63 @@
+
+
 import datetime
+import os
 
 class IslemYonetimi:
     def __init__(self, envanter_yoneticisi):
-        # Envanter motorunu buraya bağlayarak ortak veritabanı kullanmalarını sağlıyoruz
         self.kutuphane_db = envanter_yoneticisi
         self.yapilan_islemler = []
         self.GECIKME_SINIRI = 15  # Gün
         self.GUNLUK_CEZA = 1.5    # TL
+        
+        # İşlemleri kaydedeceğimiz dosyanın yolunu belirliyoruz
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.dosya_yolu = os.path.join(BASE_DIR, "data", "islemler.txt")
+        self.islemleri_yukle()
 
-    def odunc_ver(self, isbn, kac_gun_once):
-        """Kitabı ödünç verir, stoğunu düşürür ve işlemi listeye kaydeder."""
+    def islemleri_yukle(self):
+        """islemler.txt dosyasından aktif ödünçleri okur."""
+        self.yapilan_islemler = []
+        if not os.path.exists(self.dosya_yolu):
+            return
+            
+        with open(self.dosya_yolu, "r", encoding="utf-8") as dosya:
+            for satir in dosya:
+                temiz_satir = satir.strip()
+                if not temiz_satir:
+                    continue
+                parcalar = temiz_satir.split(",")
+                if len(parcalar) == 4:
+                    isbn, kitap_ad, verilis_str, iade_str = parcalar
+                    self.yapilan_islemler.append({
+                        "isbn": isbn,
+                        "kitap_ad": kitap_ad,
+                        "verilis_tarihi": datetime.datetime.strptime(verilis_str, "%Y-%m-%d"),
+                        "iade_tarihi": datetime.datetime.strptime(iade_str, "%Y-%m-%d")
+                    })
+
+    def islemleri_kaydet(self):
+        """Aktif ödünçleri islemler.txt dosyasına yazar."""
+        # data klasörü yoksa oluştur
+        os.makedirs(os.path.dirname(self.dosya_yolu), exist_ok=True)
+        with open(self.dosya_yolu, "w", encoding="utf-8") as dosya:
+            for islem in self.yapilan_islemler:
+                verilis_str = islem["verilis_tarihi"].strftime("%Y-%m-%d")
+                iade_str = islem["iade_tarihi"].strftime("%Y-%m-%d")
+                dosya.write(f"{islem['isbn']},{islem['kitap_ad']},{verilis_str},{iade_str}\n")
+
+    def odunc_ver(self, isbn, gecmis_gun=0):
+        """Kitabı ödünç verir, stoğunu düşürür ve dosyaya kaydeder. 
+        gecmis_gun parametresi ile test amaçlı geçmiş tarihe işlem yapılabilir."""
+        import datetime # Garanti olsun diye ekledik
+        
         for kitap in self.kutuphane_db.envanter:
             if kitap.isbn == isbn:
                 if kitap.stok > 0:
                     kitap.stok -= 1
-                    self.kutuphane_db.veriyi_kaydet() # kitaplar.txt anlık güncellenir
                     
-                    # Arkadaşının tarih simülasyon motoru
-                    verilis = datetime.datetime.now() - datetime.timedelta(days=kac_gun_once)
+                    # 🔥 İŞTE ZAMAN YOLCULUĞU BURADA: Bugünden gecmis_gun kadar geriye gidiyoruz
+                    verilis = datetime.datetime.now() - datetime.timedelta(days=gecmis_gun)
                     iade_hedef = verilis + datetime.timedelta(days=self.GECIKME_SINIRI)
                     
                     self.yapilan_islemler.append({
@@ -26,41 +66,33 @@ class IslemYonetimi:
                         "verilis_tarihi": verilis,
                         "iade_tarihi": iade_hedef
                     })
-                    print(f"[İŞLEM] '{kitap.ad}' ödünç verildi. Son İade: {iade_hedef.strftime('%d-%m-%Y')}")
-                    return True
+                    self.islemleri_kaydet()
+                    return True, f"'{kitap.ad}' başarıyla ödünç verildi."
                 else:
-                    print(f"[UYARI] {kitap.ad} şu an stokta yok.")
-                    return False
-        print(f"[HATA] ISBN: {isbn} olan kitap bulunamadı.")
-        return False
+                    return False, f"'{kitap.ad}' stokta kalmamış!"
+        return False, "Bu ISBN numarasına ait kitap bulunamadı."
 
-    def analiz_raporu(self):
-        """Konsola rapor yazdırmak için (Arkadaşının yazdığı orijinal analiz şovu)"""
-        print("\n" + "="*60)
-        print(f"{'KÜTÜPHANE YÖNETİM VE ANALİZ RAPORU':^60}")
-        print("="*60)
-        print(f"{'Kitap Adı':<30} | {'Durum':<12} | {'Ceza':<10}")
-        print("-" * 60)
-        
-        toplam_ceza = 0
-        simdi = datetime.datetime.now()
-        
+    def iade_al(self, isbn):
+        """Kitabı iade alır, cezayı hesaplar, stoğu artırır ve dosyadan siler."""
         for islem in self.yapilan_islemler:
-            kitap_adi = islem["kitap_ad"]
-            iade_vakti = islem["iade_tarihi"]
-            
-            if simdi > iade_vakti:
-                gecikme_gun = (simdi - iade_vakti).days
-                ceza = gecikme_gun * self.GUNLUK_CEZA
-                toplam_ceza += ceza
-                durum = f"{gecikme_gun} Gün Gecikti"
-                print(f"{kitap_adi[:30]:<30} | {durum:<12} | {ceza:>6.2f} TL")
-            else:
-                kalan_gun = (iade_vakti - simdi).days
-                durum = f"{kalan_gun} Gün Kaldı"
-                print(f"{kitap_adi[:30]:<30} | {durum:<12} | {'0.00':>6} TL")
+            if islem["isbn"] == isbn:
+                simdi = datetime.datetime.now()
+                ceza = 0
+                if simdi > islem["iade_tarihi"]:
+                    gecikme = (simdi - islem["iade_tarihi"]).days
+                    ceza = gecikme * self.GUNLUK_CEZA
                 
-        print("-" * 60)
-        print(f"{'TOPLAM CEZA:':<45} {toplam_ceza:>8.2f} TL")
-        print("="*60)
-        return toplam_ceza
+                # İşlemi listeden çıkar ve kaydet
+                self.yapilan_islemler.remove(islem)
+                self.islemleri_kaydet()
+                
+                # Stoğu geri ekle
+                for kitap in self.kutuphane_db.envanter:
+                    if kitap.isbn == isbn:
+                        kitap.stok += 1
+                        # self.kutuphane_db.veriyi_kaydet() # Stok güncellemesini kaydet
+                        break
+                        
+                mesaj = f"İade başarılı! Kesilen Ceza: {ceza} TL" if ceza > 0 else "İade başarılı, ceza yok. Teşekkürler!"
+                return True, mesaj
+        return False, "Bu ISBN numarasıyla aktif bir ödünç işlemi bulunamadı."

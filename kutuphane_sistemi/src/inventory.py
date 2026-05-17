@@ -1,10 +1,11 @@
 import os
+from src.utils import veri_dosyasi_yolu
 
 class Kitap:
     def __init__(self, ad, yazar, isbn, stok, konum):
         self.ad = ad
         self.yazar = yazar
-        self.isbn = isbn
+        self.isbn = str(isbn)
         self.stok = int(stok)
         self.konum = konum
 
@@ -17,24 +18,29 @@ class Kitap:
 
 
 class EnvanterYonetimi:
-    def __init__(self, dosya_adi="kitaplar.txt"):
-        self.dosya_adi = dosya_adi
+    def __init__(self):
         self.envanter = []
+        # Jilet gibi utils bağlantımız: Direkt data/kitaplar.txt'ye gider
+        self.dosya_yolu = veri_dosyasi_yolu("kitaplar.txt")
         self.veriyi_yukle()
 
     # Görev Tanımı: Metin dosyası aracılığıyla kalıcı depolama (Okuma)
     def veriyi_yukle(self):
-        if not os.path.exists(self.dosya_adi):
+        if not os.path.exists(self.dosya_yolu):
             return
-        with open(self.dosya_adi, "r", encoding="utf-8") as f:
+        with open(self.dosya_yolu, "r", encoding="utf-8") as f:
             for satir in f:
-                if satir.strip():
-                    ad, yazar, isbn, stok, konum = satir.strip().split(",")
-                    self.envanter.append(Kitap(ad, yazar, isbn, stok, konum))
+                temiz_satir = satir.strip()
+                if temiz_satir:
+                    parcalar = temiz_satir.split(",")
+                    # Defansif kod: Sadece 5 parçalı doğru satırları kabul et
+                    if len(parcalar) == 5:
+                        ad, yazar, isbn, stok, konum = parcalar
+                        self.envanter.append(Kitap(ad, yazar, isbn, stok, konum))
 
     # Görev Tanımı: Metin dosyasına kalıcı kaydetme (Yazma)
     def veriyi_kaydet(self):
-        with open(self.dosya_adi, "w", encoding="utf-8") as f:
+        with open(self.dosya_yolu, "w", encoding="utf-8") as f:
             for kitap in self.envanter:
                 f.write(kitap.formatla())
 
@@ -97,26 +103,3 @@ class EnvanterYonetimi:
         for kitap in gosterilecek_liste:
             print(kitap)
         print("---------------------------\n")
-
-
-# ---- KULLANIM ÖRNEĞİ (Test Etmek İçin) ----
-if __name__ == "__main__":
-    # Sistem başlatılıyor (Dosyadan veriler otomatik yüklenir)
-    yonetici = EnvanterYonetimi()
-
-    # Eğer dosya boşsa test verileri ekleyelim
-    if not yonetici.envanter:
-        yonetici.kitap_ekle(Kitap("Sefiller", "Victor Hugo", "12345", 5, "A-3"))
-        yonetici.kitap_ekle(Kitap("Suç ve Ceza", "Dostoyevski", "67890", 3, "B-1"))
-        yonetici.kitap_ekle(Kitap("Simyacı", "Paulo Coelho", "11223", 7, "A-1"))
-
-    # 1. Listeleme
-    yonetici.kitaplari_goster()
-
-    # 2. Güncelleme Testi
-    yonetici.kitap_guncelle("12345", yeni_stok=10, yeni_konum="A-4")
-
-    # 3. Çok Kriterli Arama Testi (Örn: Yazara göre arama)
-    print("🔎 'Hugo' yazarına göre arama sonuçları:")
-    sonuclar = yonetici.kitap_ara("Hugo", kriter="yazar")
-    yonetici.kitaplari_goster(sonuclar)
