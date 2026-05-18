@@ -60,31 +60,153 @@ def ana_menu_ac(kullanici_adi, rol):
         kart_frame = ctk.CTkFrame(icerik_alani, fg_color="transparent")
         kart_frame.pack(fill="x", padx=40, pady=20)
 
-        def bilgi_karti(parent, baslik, deger, renk):
-            k = ctk.CTkFrame(parent, width=220, height=120, corner_radius=15, fg_color=renk)
+        # Kartları tıklanabilir butona dönüştüren fonksiyon
+        def bilgi_karti(parent, baslik, deger, renk, command=None):
+            k = ctk.CTkFrame(parent, width=220, height=120, corner_radius=15, fg_color=renk, cursor="hand2" if command else None)
             k.pack(side="left", padx=(0, 20), expand=True, fill="both")
             k.pack_propagate(False)
-            ctk.CTkLabel(k, text=baslik, font=("Helvetica", 14), text_color="white").pack(pady=(20, 5))
-            ctk.CTkLabel(k, text=str(deger), font=("Helvetica", 32, "bold"), text_color="white").pack()
+            
+            lbl_baslik = ctk.CTkLabel(k, text=baslik, font=("Helvetica", 14), text_color="white")
+            lbl_baslik.pack(pady=(20, 5))
+            lbl_deger = ctk.CTkLabel(k, text=str(deger), font=("Helvetica", 32, "bold"), text_color="white")
+            lbl_deger.pack()
+            
+            if command:
+                k.bind("<Button-1>", lambda e: command())
+                lbl_baslik.bind("<Button-1>", lambda e: command())
+                lbl_deger.bind("<Button-1>", lambda e: command())
 
         # ==========================================
         # 🚀 DİNAMİK VERİ ÇEKİM ALANI
         # ==========================================
-        # 1. Toplam Kitap (inventory.py'den anlık çeker)
         guncel_kitap_sayisi = len(kutuphane_db.envanter)
-
-        # 2. Aktif Ödünç ve Toplam Üye (Şimdilik Sabit)
         aktif_odunc_sayisi = len(islem_db.yapilan_islemler)
-        toplam_uye_sayisi = 412
-
-        bilgi_karti(kart_frame, "📚 Toplam Kitap", guncel_kitap_sayisi, "#007A87")
-        bilgi_karti(kart_frame, "🔄 Aktif Ödünç", aktif_odunc_sayisi, "#D97706") # ARTIK CANLI!
-        bilgi_karti(kart_frame, "👥 Toplam Üye", toplam_uye_sayisi, "#4338CA")
-
-        # Hoş geldin mesajı (Sadece 1 tane)
-        ctk.CTkLabel(icerik_alani, text=f"Hoş geldin {kullanici_adi}. Keyifli çalışmalar!", font=("Helvetica", 16), text_color="gray").pack(pady=40)
         
-    # --- POP-UP: YENİ KİTAP EKLEME FORMU ---
+        uye_dosyasi = os.path.join(BASE_DIR, "data", "users.txt")
+        topham_uye_sayisi = 0
+        try:
+            with open(uye_dosyasi, "r", encoding="utf-8") as f:
+                topham_uye_sayisi = sum(1 for satir in f if satir.strip())
+        except FileNotFoundError:
+            topham_uye_sayisi = 0
+
+        # --- YENİ ÜYE KAYIT MOTORU VE YÖNETİM PANELİ ---
+        def uye_islem_tetikle():
+            if rol != "yonetici":
+                from tkinter import messagebox
+                messagebox.showerror("Yetkisiz Erişim", "Bu alanı görüntülemeye yetkiniz yoktur!")
+                return
+            
+            os.makedirs(os.path.dirname(uye_dosyasi), exist_ok=True)
+            if not os.path.exists(uye_dosyasi):
+                open(uye_dosyasi, 'w').close()
+            
+            yonetim_popup = ctk.CTkToplevel(dashboard)
+            yonetim_popup.title("Üye Yönetim Paneli")
+            yonetim_popup.geometry("500x600")
+            yonetim_popup.configure(fg_color="#1E1E1E")
+            yonetim_popup.attributes("-topmost", True)
+            yonetim_popup.resizable(False, False)
+            
+            yonetim_popup.update_idletasks()
+            x = (yonetim_popup.winfo_screenwidth() // 2) - (500 // 2)
+            y = (yonetim_popup.winfo_screenheight() // 2) - (600 // 2)
+            yonetim_popup.geometry(f"+{x}+{y}")
+
+            ust_bar = ctk.CTkFrame(yonetim_popup, fg_color="transparent")
+            ust_bar.pack(fill="x", padx=20, pady=20)
+            
+            ctk.CTkLabel(ust_bar, text="👥 Sistem Üyeleri", font=("Helvetica", 22, "bold"), text_color="white").pack(side="left")
+            
+            liste_alani = ctk.CTkScrollableFrame(yonetim_popup, fg_color="transparent")
+            liste_alani.pack(fill="both", expand=True, padx=20, pady=10)
+
+            def listeyi_yenile():
+                for widget in liste_alani.winfo_children():
+                    widget.destroy()
+                try:
+                    with open(uye_dosyasi, "r", encoding="utf-8") as f:
+                        for satir in f:
+                            satir = satir.strip()
+                            if satir:
+                                parcalar = satir.split(',')
+                                if len(parcalar) >= 3:
+                                    u_adi, sifre_hash, u_rol = parcalar[0], parcalar[1], parcalar[2]
+                                    satir_frame = ctk.CTkFrame(liste_alani, fg_color="#2A2A2A", height=45, corner_radius=10)
+                                    satir_frame.pack(fill="x", pady=5)
+                                    ctk.CTkLabel(satir_frame, text=f"👤 {u_adi}", font=("Helvetica", 15, "bold"), text_color="white").pack(side="left", padx=15, pady=10)
+                                    rol_renk = "#D97706" if u_rol == "yonetici" else "#059669" if u_rol == "personel" else "#4338CA"
+                                    ctk.CTkLabel(satir_frame, text=u_rol.upper(), font=("Helvetica", 12, "bold"), fg_color=rol_renk, text_color="white", corner_radius=8, width=90, height=28).pack(side="right", padx=15)
+                except Exception as e:
+                    print(f"Liste yükleme hatası: {e}")
+
+            def yeni_kayit_ac():
+                uye_popup = ctk.CTkToplevel(yonetim_popup)
+                uye_popup.title("Yeni Üye Kaydı")
+                uye_popup.geometry("400x450")
+                uye_popup.configure(fg_color="#1E1E1E")
+                uye_popup.attributes("-topmost", True)
+                uye_popup.resizable(False, False)
+                
+                uye_popup.update_idletasks()
+                xx = (uye_popup.winfo_screenwidth() // 2) - (400 // 2)
+                yy = (uye_popup.winfo_screenheight() // 2) - (450 // 2)
+                uye_popup.geometry(f"+{xx}+{yy}")
+
+                ctk.CTkLabel(uye_popup, text="➕ Yeni Üye Kaydı", font=("Helvetica", 22, "bold"), text_color="white").pack(pady=(25, 20))
+
+                u_stil = {"width": 300, "height": 45, "font": ("Helvetica", 14), "corner_radius": 10, "fg_color": "#2A2A2A", "border_color": "#4338CA"}
+                
+                yeni_username_entry = ctk.CTkEntry(uye_popup, placeholder_text="Kullanıcı Adı", **u_stil)
+                yeni_username_entry.pack(pady=10)
+                
+                yeni_sifre_entry = ctk.CTkEntry(uye_popup, placeholder_text="Şifre", show="*", **u_stil)
+                yeni_sifre_entry.pack(pady=10)
+                
+                rol_var = ctk.StringVar(value="ogrenci")
+                rol_menu = ctk.CTkOptionMenu(uye_popup, variable=rol_var, values=["ogrenci", "personel", "yonetici"], width=300, height=45, fg_color="#2A2A2A", button_color="#4338CA", button_hover_color="#4F46E5")
+                rol_menu.pack(pady=10)
+
+                def uye_kaydet():
+                    u_adi = yeni_username_entry.get().lower().strip()
+                    s_metin = yeni_sifre_entry.get()
+                    secilen_rol = rol_var.get()
+                    
+                    if not u_adi or not s_metin:
+                        from tkinter import messagebox
+                        messagebox.showwarning("Eksik Veri", "Lütfen tüm alanları doldurun!", parent=uye_popup)
+                        return
+                    
+                    import hashlib
+                    hashli = hashlib.sha256(s_metin.encode()).hexdigest()
+                    
+                    try:
+                        with open(uye_dosyasi, "a", encoding="utf-8") as f:
+                            f.write(f"{u_adi},{hashli},{secilen_rol}\n")
+                        uye_popup.destroy()
+                        listeyi_yenile() 
+                        sayfa_ana_ekran() 
+                    except Exception as e:
+                        print(f"Kayıt Hatası: {e}")
+                        from tkinter import messagebox
+                        messagebox.showerror("Hata", f"Yazma hatası: {e}", parent=uye_popup)
+
+                btn_frame = ctk.CTkFrame(uye_popup, fg_color="transparent")
+                btn_frame.pack(pady=(25, 10))
+                ctk.CTkButton(btn_frame, text="İptal", command=uye_popup.destroy, width=120, height=40, fg_color="transparent", border_width=2, border_color="#7F1D1D", hover_color="#7F1D1D").pack(side="left", padx=10)
+                ctk.CTkButton(btn_frame, text="Kaydet", command=uye_kaydet, width=120, height=40, fg_color="#4338CA", hover_color="#4F46E5").pack(side="right", padx=10)
+
+            ctk.CTkButton(ust_bar, text="➕ Yeni Kayıt", command=yeni_kayit_ac, width=130, height=40, font=("Helvetica", 14, "bold"), fg_color="#059669", hover_color="#047857").pack(side="right")
+            listeyi_yenile()
+
+        # --- KARTLARI EKRANA BASMA ALANI ---
+        bilgi_karti(kart_frame, "📚 Toplam Kitap", guncel_kitap_sayisi, "#007A87")
+        bilgi_karti(kart_frame, "🔄 Aktif Ödünç", aktif_odunc_sayisi, "#D97706")
+        
+        gosterilecek_uye_sayisi = topham_uye_sayisi if rol == "yonetici" else "🔒 Kilitli"
+        bilgi_karti(kart_frame, "👥 Toplam Üye", gosterilecek_uye_sayisi, "#4338CA", command=uye_islem_tetikle)
+
+        ctk.CTkLabel(icerik_alani, text=f"Hoş geldin {kullanici_adi}. Keyifli çalışmalar!", font=("Helvetica", 16), text_color="gray").pack(pady=40)# --- POP-UP: YENİ KİTAP EKLEME FORMU ---
     def kitap_ekle_popup():
         popup = ctk.CTkToplevel(dashboard)
         popup.title("Yeni Kitap Ekle")
