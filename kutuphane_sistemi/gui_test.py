@@ -124,7 +124,7 @@ def ana_menu_ac(kullanici_adi, rol):
         ctk.CTkButton(buton_frame, text="İptal", command=popup.destroy, width=140, height=45, fg_color="transparent", border_width=2, border_color="#7F1D1D", hover_color="#7F1D1D").pack(side="left", padx=15)
         ctk.CTkButton(buton_frame, text="Kaydet", command=kaydet, width=140, height=45, fg_color="#007A87", hover_color="#0097A7").pack(side="right", padx=15)
 
-    # --- SAYFA: KİTAP İŞLEMLERİ (TABLO) ---
+    
     # --- SAYFA: KİTAP İŞLEMLERİ (TABLO VE ARAMA) ---
     def sayfa_kitap_islemleri():
         sayfayi_temizle()
@@ -202,13 +202,44 @@ def ana_menu_ac(kullanici_adi, rol):
         islem_bar.pack(fill="x", padx=40, pady=10)
 
         if rol == "yonetici":
+            
             def hizli_odunc_ver():
-                dialog = ctk.CTkInputDialog(text="Ödünç verilecek kitabın ISBN numarası:", title="Ödünç Ver")
-                isbn = dialog.get_input()
-                if isbn:
-                    basari, mesaj = islem_db.odunc_ver(isbn)
-                    print(f"[SİSTEM] {mesaj}") 
-                    sayfa_odunc_takibi() 
+                # Üst üste açılan input bug'ını çözmek için özel pop-up tasarımı!
+                odunc_popup = ctk.CTkToplevel(icerik_alani)
+                odunc_popup.title("Kitap Ödünç Ver")
+                odunc_popup.geometry("400x350")
+                odunc_popup.configure(fg_color="#1E1E1E")
+                odunc_popup.attributes("-topmost", True)
+                odunc_popup.resizable(False, False)
+                
+                # Pop-up'ı tam ekranın ortasına al
+                odunc_popup.update_idletasks()
+                x = (odunc_popup.winfo_screenwidth() // 2) - (400 // 2)
+                y = (odunc_popup.winfo_screenheight() // 2) - (350 // 2)
+                odunc_popup.geometry(f"+{x}+{y}")
+
+                ctk.CTkLabel(odunc_popup, text="📤 Kitap Ödünç Verme", font=("Helvetica", 22, "bold"), text_color="white").pack(pady=(25, 20))
+
+                isbn_entry = ctk.CTkEntry(odunc_popup, placeholder_text="Kitap ISBN Numarası", width=300, height=45, font=("Helvetica", 14), fg_color="#2A2A2A", border_color="#D97706")
+                isbn_entry.pack(pady=10)
+
+                ogrenci_entry = ctk.CTkEntry(odunc_popup, placeholder_text="Öğrenci Kullanıcı Adı (Örn: batuhan)", width=300, height=45, font=("Helvetica", 14), fg_color="#2A2A2A", border_color="#D97706")
+                ogrenci_entry.pack(pady=10)
+
+                def onayla():
+                    isbn = isbn_entry.get()
+                    ogrenci = ogrenci_entry.get()
+                    if isbn and ogrenci:
+                        basari, mesaj = islem_db.odunc_ver(isbn, ogrenci_adi=ogrenci.lower().strip())
+                        print(f"[SİSTEM] {mesaj}")
+                        odunc_popup.destroy()
+                        sayfa_odunc_takibi() # Listeyi anında yenile!
+
+                buton_frame = ctk.CTkFrame(odunc_popup, fg_color="transparent")
+                buton_frame.pack(pady=(20, 10))
+                
+                ctk.CTkButton(buton_frame, text="İptal", command=odunc_popup.destroy, width=120, height=40, fg_color="transparent", border_width=2, border_color="#7F1D1D", hover_color="#7F1D1D").pack(side="left", padx=10)
+                ctk.CTkButton(buton_frame, text="Onayla", command=onayla, width=120, height=40, fg_color="#D97706", hover_color="#B45309").pack(side="right", padx=10)
 
             def hizli_iade_al():
                 dialog = ctk.CTkInputDialog(text="İade edilecek kitabın ISBN numarası:", title="İade Al")
@@ -231,34 +262,49 @@ def ana_menu_ac(kullanici_adi, rol):
         # Tablo Başlıkları
         tablo_baslik = ctk.CTkFrame(icerik_alani, fg_color="#2A2A2A", height=40)
         tablo_baslik.pack(fill="x", padx=40, pady=(10, 0))
-        ctk.CTkLabel(tablo_baslik, text="Kitap Adı", width=250, anchor="w", font=("Helvetica", 14, "bold")).pack(side="left", padx=10)
+        ctk.CTkLabel(tablo_baslik, text="Kitap Adı", width=220, anchor="w", font=("Helvetica", 14, "bold")).pack(side="left", padx=10)
         ctk.CTkLabel(tablo_baslik, text="Veriliş", width=100, anchor="w", font=("Helvetica", 14, "bold")).pack(side="left", padx=10)
         ctk.CTkLabel(tablo_baslik, text="Son İade", width=100, anchor="w", font=("Helvetica", 14, "bold")).pack(side="left", padx=10)
+        
+        # 👑 YÖNETİCİ EKRANINA ÖĞRENCİ SÜTUNU
+        if rol == "yonetici":
+            ctk.CTkLabel(tablo_baslik, text="Öğrenci", width=100, anchor="w", font=("Helvetica", 14, "bold")).pack(side="left", padx=10)
+
         ctk.CTkLabel(tablo_baslik, text="Durum & Ceza", width=150, font=("Helvetica", 14, "bold")).pack(side="right", padx=20)
 
         liste_alani = ctk.CTkScrollableFrame(icerik_alani, fg_color="transparent")
         liste_alani.pack(fill="both", expand=True, padx=40, pady=5)
 
-        islemler = islem_db.yapilan_islemler
+        # 🎯 ROL BAZLI FİLTRELEME ALGORİTMASI
+        tum_islemler = islem_db.yapilan_islemler
+        if rol == "yonetici":
+            gosterilecek_islemler = tum_islemler
+        else:
+            # Öğrenci giriş yaptıysa sadece kendi kullanıcı adına açılmış logları filtrele
+            gosterilecek_islemler = [i for i in tum_islemler if i.get("ogrenci_adi") == kullanici_adi.lower().strip()]
 
-        if not islemler:
-            ctk.CTkLabel(liste_alani, text="📭 Şu an aktif ödünç işlemi bulunmuyor.", font=("Helvetica", 16), text_color="gray").pack(pady=40)
+        if not gosterilecek_islemler:
+            ctk.CTkLabel(liste_alani, text="📭 Aktif ödünç işlemi bulunmuyor.", font=("Helvetica", 16), text_color="gray").pack(pady=40)
             return
 
         import datetime 
         simdi = datetime.datetime.now()
 
-        for islem in islemler:
+        for islem in gosterilecek_islemler:
             satir = ctk.CTkFrame(liste_alani, fg_color="transparent")
             satir.pack(fill="x", pady=8)
 
-            ctk.CTkLabel(satir, text=islem["kitap_ad"], width=250, anchor="w", font=("Helvetica", 14)).pack(side="left", padx=10)
+            ctk.CTkLabel(satir, text=islem["kitap_ad"], width=220, anchor="w", font=("Helvetica", 14)).pack(side="left", padx=10)
 
             verilis_str = islem["verilis_tarihi"].strftime("%d/%m/%Y")
             iade_str = islem["iade_tarihi"].strftime("%d/%m/%Y")
 
             ctk.CTkLabel(satir, text=verilis_str, width=100, anchor="w", text_color="gray").pack(side="left", padx=10)
             ctk.CTkLabel(satir, text=iade_str, width=100, anchor="w", text_color="gray").pack(side="left", padx=10)
+
+            # 👑 YÖNETİCİ EKRANINDA HANGİ ÖĞRENCİDE OLDUĞUNU YAZ
+            if rol == "yonetici":
+                ctk.CTkLabel(satir, text=islem.get("ogrenci_adi", "bilinmiyor"), width=100, anchor="w", text_color="#007A87", font=("Helvetica", 13, "bold")).pack(side="left", padx=10)
 
             iade_vakti = islem["iade_tarihi"]
             if simdi > iade_vakti:
@@ -271,8 +317,8 @@ def ana_menu_ac(kullanici_adi, rol):
                 durum_metni = f"{kalan} Gün Kaldı"
                 renk = "green" 
 
-            ctk.CTkLabel(satir, text=durum_metni, fg_color=renk, corner_radius=10, width=150, height=28, text_color="white", font=("Helvetica", 12, "bold")).pack(side="right", padx=20)        
-    # --- 4. SIDEBAR BUTONLARI (TEMİZ VE TEKİL) ---
+            ctk.CTkLabel(satir, text=durum_metni, fg_color=renk, corner_radius=10, width=150, height=28, text_color="white", font=("Helvetica", 12, "bold")).pack(side="right", padx=20)
+    # --- 4. SIDEBAR BUTONLARI ---
     btn_font = ("Helvetica", 16, "bold")
     
     btn_ana = ctk.CTkButton(sidebar, text="  🏠  Ana Sayfa", command=sayfa_ana_ekran, height=50, anchor="w", font=btn_font, fg_color="transparent", hover_color="#007A87")
@@ -284,8 +330,9 @@ def ana_menu_ac(kullanici_adi, rol):
     btn_odunc = ctk.CTkButton(sidebar, text="  💸  Ödünç ve Ceza", command=sayfa_odunc_takibi, height=50, anchor="w", font=btn_font, fg_color="transparent", hover_color="#007A87")
     btn_odunc.pack(fill="x", pady=10, padx=15)
 
-    ctk.CTkLabel(sidebar, text="").pack(expand=True) # Araya boşluk atar
+    ctk.CTkLabel(sidebar, text="").pack(expand=True) # Kapat butonuyla araya boşluk atar
 
+    # BUNDAN SONRA SENİN KODDAKİ "def tam_cikis():" KISMI DEVAM EDECEK...
     def tam_cikis():
         app.destroy()
         
